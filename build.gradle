@@ -1,0 +1,46 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+}
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+jar {
+    manifest {
+        attributes(
+                'Main-Class': 'koa.Main'
+        )
+    }
+}
+
+shadowJar {
+    archiveFileName = 'koa.jar'
+    manifest {
+        attributes 'Main-Class': 'koa.Main'
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url "https://oss.sonatype.org/content/groups/public/" }
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    // lombok
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+    // swingx
+    implementation 'org.swinglabs.swingx:swingx-all:1.6.5-1'
+
+    // open csv
+    implementation 'com.opencsv:opencsv:5.7.1'
+}
+
+test {
+    useJUnitPlatform()
+}
