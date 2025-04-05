@@ -12,6 +12,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import java.awt.*;
+import java.util.List;
 import java.util.ArrayList;
 
 public class AddGamePanel extends JPanel {
@@ -139,15 +140,43 @@ public class AddGamePanel extends JPanel {
         panel.add(playerSelectionPanel, BorderLayout.CENTER);
 
         // init result panel
-        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        bottomPanel.add(new JLabel("게임 결과:"));
+        JPanel bottomContainer = new JPanel();
+        bottomContainer.setLayout(new BoxLayout(bottomContainer, BoxLayout.Y_AXIS));
+
+        JPanel resultPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        resultPanel.add(new JLabel("게임 결과:"));
         String[] gameResults = Result.getResultListName();
-        JComboBox<String> resultComboBox = new JComboBox<>(gameResults);
-        bottomPanel.add(resultComboBox);
-        bottomPanel.add(new JLabel("    비고:"));
+
+        ButtonGroup resultGroup = new ButtonGroup();
+        JPanel radioPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        List<JRadioButton> radioButtons = new ArrayList<>();
+        for (int i = 0; i < gameResults.length; i++)  {
+            String result = gameResults[i];
+            JRadioButton radioButton = new JRadioButton(result);
+            resultGroup.add(radioButton);
+            radioPanel.add(radioButton);
+            radioButtons.add(radioButton);
+            if (i == 0) {
+                radioButton.setSelected(true);
+            }
+        }
+        resultPanel.add(radioPanel);
+
+        resultPanel.add(new JLabel("    비고:"));
         JTextField noteField = new JTextField(20);
-        bottomPanel.add(noteField);
-        panel.add(bottomPanel, BorderLayout.SOUTH);
+        resultPanel.add(noteField);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton okButton = new JButton("OK");
+        JButton cancelButton = new JButton("Cancel");
+        buttonPanel.add(okButton);
+        buttonPanel.add(cancelButton);
+
+        bottomContainer.add(resultPanel);
+        bottomContainer.add(buttonPanel);
+
+        panel.add(bottomContainer, BorderLayout.SOUTH);
 
         // search button action
         searchAButton.addActionListener(e -> {
@@ -166,31 +195,47 @@ public class AddGamePanel extends JPanel {
         });
 
         // open dialog
-        int option = JOptionPane.showConfirmDialog(null, panel, "게임 추가", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (option == JOptionPane.OK_OPTION) {
+        JDialog dialog = new JDialog((Frame) null, "게임 추가", true);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.getContentPane().add(panel);
+        dialog.pack();
+        dialog.setLocationRelativeTo(null);
+
+        okButton.addActionListener(e -> {
             Player playerA = playerAList.getSelectedValue();
             Player playerB = playerBList.getSelectedValue();
-            String resultStr = (String) resultComboBox.getSelectedItem();
+            //String resultStr = (String) resultComboBox.getSelectedItem();
+
+            String resultStr = null;
+            for (JRadioButton rb : radioButtons) {
+                if (rb.isSelected()) {
+                    resultStr = rb.getText();
+                    break;
+                }
+            }
+
             Result gameResult = Result.of(resultStr);
             String note = noteField.getText();
 
             if (playerA == null || playerB == null) {
-                JOptionPane.showMessageDialog(null, "두 플레이어를 모두 선택하세요.", "입력 오류", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-            if (playerA == playerB) {
-                JOptionPane.showMessageDialog(null, "서로 다른 플레이어를 선택하세요.", "입력 오류", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
+                JOptionPane.showMessageDialog(dialog, "두 플레이어를 모두 선택하세요.", "입력 오류", JOptionPane.WARNING_MESSAGE);
+            } else if (playerA == playerB) {
+                JOptionPane.showMessageDialog(dialog, "서로 다른 플레이어를 선택하세요.", "입력 오류", JOptionPane.WARNING_MESSAGE);
+            } else {
+                Game game = new Game(tournament.getId(), playerA.getId(), playerB.getId(), gameResult, note);
+                GameRepository.getInstance().insert(game);
+                GameRepository.getInstance().save();
+                tournament.getGameIds().add(game.getId());
+                TournamentRepository.getInstance().save();
 
-            Game game = new Game(tournament.getId(), playerA.getId(), playerB.getId(), gameResult, note);
-            GameRepository.getInstance().insert(game);
-            GameRepository.getInstance().save();
-            tournament.getGameIds().add(game.getId());
-            TournamentRepository.getInstance().save();
+                gameTableModel.addRow(getGameRow(game));
+                dialog.dispose();
+            }
+        });
 
-            gameTableModel.addRow(getGameRow(game));
-        }
+        cancelButton.addActionListener(e -> dialog.dispose());
+
+        dialog.setVisible(true);
     }
 
     private void deleteGame() {
