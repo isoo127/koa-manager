@@ -1,6 +1,7 @@
 package koa.gui;
 
 import koa.model.player.Player;
+import koa.model.player.Rating;
 import koa.model.tournament.Game;
 import koa.model.tournament.Result;
 import koa.model.tournament.Tournament;
@@ -106,8 +107,11 @@ public class AddGamePanel extends JPanel {
         addGameButton.addActionListener(e -> openAddGameDialog(-1L));
         JButton deleteGameButton = new JButton("게임 삭제");
         deleteGameButton.addActionListener(e -> deleteGame());
+        JButton showResultButton = new JButton("총 결과");
+        showResultButton.addActionListener(e -> showResultDialog());
         buttonPanel.add(addGameButton);
         buttonPanel.add(deleteGameButton);
+        buttonPanel.add(showResultButton);
 
         setLayout(new BorderLayout());
         add(infoPanel, BorderLayout.NORTH);
@@ -330,6 +334,64 @@ public class AddGamePanel extends JPanel {
             }
         }
         return result;
+    }
+
+    private void showResultDialog() {
+        JDialog dialog = new JDialog((Frame) null, "총 결과", true);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setLayout(new BorderLayout());
+
+        showResultTable(dialog);
+
+        dialog.setSize(600, 400);
+        dialog.setLocationRelativeTo(null);
+        dialog.setVisible(true);
+    }
+
+    private void showResultTable(JDialog dialog) {
+        String[] gameColumnNames = {"순위", "이름", "전적", "승", "무", "패"};
+
+        Rating rating = new Rating();
+        for (Long gameId : tournament.getGameIds()) {
+            Game game = GameRepository.getInstance().findById(gameId);
+            Player bp = PlayerRepository.getInstance().findById(game.getBlackPlayerId());
+            Player wp = PlayerRepository.getInstance().findById(game.getWhitePlayerId());
+            rating.updateRating(bp, wp, game.getResult(), 1);
+        }
+        Object[][] ratingList = rating.getAllRanking();
+        Object[][] resultData = new Object[ratingList.length][gameColumnNames.length];
+        for (int i = 0; i < ratingList.length; i++) {
+            resultData[i][0] = ratingList[i][0];
+            resultData[i][1] = ratingList[i][1];
+            resultData[i][2] = (int)ratingList[i][3] + (int)ratingList[i][4] + (int)ratingList[i][5];
+            resultData[i][3] = ratingList[i][3];
+            resultData[i][4] = ratingList[i][4];
+            resultData[i][5] = ratingList[i][5];
+        }
+
+        DefaultTableModel resultTableModel = new DefaultTableModel(0, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        JTable resultTable = new JTable(resultTableModel);
+        resultTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        resultTable.setAutoCreateColumnsFromModel(false);
+
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        for (int i = 0; i < gameColumnNames.length; i++) {
+            TableColumn column = new TableColumn(i);
+            column.setHeaderValue(gameColumnNames[i]);
+            column.setCellRenderer(centerRenderer);
+            resultTable.addColumn(column);
+        }
+
+        JScrollPane resultScrollPane = new JScrollPane(resultTable);
+        resultTableModel.setDataVector(resultData, gameColumnNames);
+
+        dialog.add(resultScrollPane);
     }
 
 }
