@@ -123,6 +123,26 @@ public class Rating {
         return ranking.toArray(new Object[ranking.size()][]);
     }
 
+    public Object[][] getAllRanking() {
+        ArrayList<Object[]> ranking = new ArrayList<>();
+
+        List<PlayerRecord> sortedRecords = new ArrayList<>(records.values());
+        sortedRecords.sort(Comparator.comparingDouble(PlayerRecord::getRating).reversed());
+        int rank = 1;
+        for (PlayerRecord record : sortedRecords) {
+            Object[] row = new Object[6];
+            row[0] = rank++;
+            row[1] = record.name;
+            row[2] = Math.round(record.rating * 100.0) / 100.0;;
+            row[3] = record.winCount;
+            row[4] = record.drawCount;
+            row[5] = record.loseCount;
+            ranking.add(row);
+        }
+
+        return ranking.toArray(new Object[ranking.size()][]);
+    }
+
     public void resetRanking() {
         records.clear();
     }

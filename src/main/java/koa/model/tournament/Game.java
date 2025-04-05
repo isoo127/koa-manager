@@ -6,6 +6,7 @@ import java.io.Serial;
 import java.io.Serializable;
 
 @Getter
+@Setter
 public class Game implements Serializable {
 
     @Serial
@@ -13,11 +14,11 @@ public class Game implements Serializable {
 
     @Setter
     private long id;
-    private final long tournamentId;
-    private final long blackPlayerId;
-    private final long whitePlayerId;
-    private final Result result;
-    private final String note;
+    private long tournamentId;
+    private long blackPlayerId;
+    private long whitePlayerId;
+    private Result result;
+    private String note;
 
     public Game(long tournamentId, long blackPlayerId, long whitePlayerId, Result result, String note) {
         this.tournamentId = tournamentId;

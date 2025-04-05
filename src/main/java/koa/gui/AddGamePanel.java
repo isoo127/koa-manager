@@ -1,6 +1,7 @@
 package koa.gui;
 
 import koa.model.player.Player;
+import koa.model.player.Rating;
 import koa.model.tournament.Game;
 import koa.model.tournament.Result;
 import koa.model.tournament.Tournament;
@@ -12,13 +13,18 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.List;
 import java.util.ArrayList;
+import java.util.Objects;
 
 public class AddGamePanel extends JPanel {
 
     private final Tournament tournament;
     DefaultTableModel gameTableModel;
     private JTable gameTable;
+    private Game game = null;
 
     public AddGamePanel(Tournament tournament) {
         this.tournament = tournament;
@@ -79,17 +85,33 @@ public class AddGamePanel extends JPanel {
             gameTable.addColumn(column);
         }
 
+        gameTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int selectedRow = gameTable.getSelectedRow();
+                    if (selectedRow != -1) {
+                        Long gameId = Long.parseLong(gameTable.getValueAt(selectedRow, 0).toString());
+                        openAddGameDialog(gameId);
+                    }
+                }
+            }
+        });
+
         JScrollPane gameScrollPane = new JScrollPane(gameTable);
         gameTableModel.setDataVector(gameData, gameColumnNames);
 
         // init add button
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton addGameButton = new JButton("게임 추가");
-        addGameButton.addActionListener(e -> addGame());
+        addGameButton.addActionListener(e -> openAddGameDialog(-1L));
         JButton deleteGameButton = new JButton("게임 삭제");
         deleteGameButton.addActionListener(e -> deleteGame());
+        JButton showResultButton = new JButton("총 결과");
+        showResultButton.addActionListener(e -> showResultDialog());
         buttonPanel.add(addGameButton);
         buttonPanel.add(deleteGameButton);
+        buttonPanel.add(showResultButton);
 
         setLayout(new BorderLayout());
         add(infoPanel, BorderLayout.NORTH);
@@ -97,7 +119,12 @@ public class AddGamePanel extends JPanel {
         add(buttonPanel, BorderLayout.SOUTH);
     }
 
-    private void addGame() {
+    private void openAddGameDialog(Long gameId) {
+        game = null;
+        if (gameId != -1) {
+            game = GameRepository.getInstance().findById(gameId);
+        }
+
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         JPanel playerSelectionPanel = new JPanel(new GridLayout(1, 2, 10, 10));
 
@@ -114,6 +141,11 @@ public class AddGamePanel extends JPanel {
 
         DefaultListModel<Player> listModelA = new DefaultListModel<>();
         JList<Player> playerAList = new JList<>(listModelA);
+        if (game != null) {
+            Player blackPlayer = PlayerRepository.getInstance().findById(game.getBlackPlayerId());
+            listModelA.addElement(blackPlayer);
+            playerAList.setSelectedValue(blackPlayer, true);
+        }
         JScrollPane scrollPaneA = new JScrollPane(playerAList);
         playerAPanel.add(scrollPaneA, BorderLayout.CENTER);
 
@@ -130,6 +162,11 @@ public class AddGamePanel extends JPanel {
 
         DefaultListModel<Player> listModelB = new DefaultListModel<>();
         JList<Player> playerBList = new JList<>(listModelB);
+        if (game != null) {
+            Player whitePlayer = PlayerRepository.getInstance().findById(game.getWhitePlayerId());
+            listModelB.addElement(whitePlayer);
+            playerBList.setSelectedValue(whitePlayer, true);
+        }
         JScrollPane scrollPaneB = new JScrollPane(playerBList);
         playerBPanel.add(scrollPaneB, BorderLayout.CENTER);
 
@@ -139,15 +176,51 @@ public class AddGamePanel extends JPanel {
         panel.add(playerSelectionPanel, BorderLayout.CENTER);
 
         // init result panel
-        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        bottomPanel.add(new JLabel("게임 결과:"));
+        JPanel bottomContainer = new JPanel();
+        bottomContainer.setLayout(new BoxLayout(bottomContainer, BoxLayout.Y_AXIS));
+
+        JPanel resultPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        resultPanel.add(new JLabel("게임 결과:"));
         String[] gameResults = Result.getResultListName();
-        JComboBox<String> resultComboBox = new JComboBox<>(gameResults);
-        bottomPanel.add(resultComboBox);
-        bottomPanel.add(new JLabel("    비고:"));
+
+        // init result radio buttons
+        ButtonGroup resultGroup = new ButtonGroup();
+        JPanel radioPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        List<JRadioButton> radioButtons = new ArrayList<>();
+        for (int i = 0; i < gameResults.length; i++)  {
+            String result = gameResults[i];
+            JRadioButton radioButton = new JRadioButton(result);
+            resultGroup.add(radioButton);
+            radioPanel.add(radioButton);
+            radioButtons.add(radioButton);
+            if (game == null && i == 0) {
+                radioButton.setSelected(true);
+            } else if (game != null && Objects.equals(result, game.getResult().toString())) {
+                radioButton.setSelected(true);
+            }
+        }
+        resultPanel.add(radioPanel);
+
+        // init note textbox
+        resultPanel.add(new JLabel("    비고:"));
         JTextField noteField = new JTextField(20);
-        bottomPanel.add(noteField);
-        panel.add(bottomPanel, BorderLayout.SOUTH);
+        resultPanel.add(noteField);
+        if (game != null) {
+            noteField.setText(game.getNote());
+        }
+
+        // init ok & cancel button
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton okButton = new JButton("OK");
+        JButton cancelButton = new JButton("Cancel");
+        buttonPanel.add(okButton);
+        buttonPanel.add(cancelButton);
+
+        bottomContainer.add(resultPanel);
+        bottomContainer.add(buttonPanel);
+
+        panel.add(bottomContainer, BorderLayout.SOUTH);
 
         // search button action
         searchAButton.addActionListener(e -> {
@@ -166,31 +239,62 @@ public class AddGamePanel extends JPanel {
         });
 
         // open dialog
-        int option = JOptionPane.showConfirmDialog(null, panel, "게임 추가", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (option == JOptionPane.OK_OPTION) {
+        String dialogTitle = (game == null) ? "게임 추가" : "게임 정보 변경 (" + game.getId() + ")";
+        JDialog dialog = new JDialog((Frame) null, dialogTitle, true);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.getContentPane().add(panel);
+        dialog.pack();
+        dialog.setLocationRelativeTo(null);
+
+        okButton.addActionListener(e -> {
             Player playerA = playerAList.getSelectedValue();
             Player playerB = playerBList.getSelectedValue();
-            String resultStr = (String) resultComboBox.getSelectedItem();
+
+            String resultStr = null;
+            for (JRadioButton rb : radioButtons) {
+                if (rb.isSelected()) {
+                    resultStr = rb.getText();
+                    break;
+                }
+            }
+
             Result gameResult = Result.of(resultStr);
             String note = noteField.getText();
 
             if (playerA == null || playerB == null) {
-                JOptionPane.showMessageDialog(null, "두 플레이어를 모두 선택하세요.", "입력 오류", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-            if (playerA == playerB) {
-                JOptionPane.showMessageDialog(null, "서로 다른 플레이어를 선택하세요.", "입력 오류", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
+                JOptionPane.showMessageDialog(dialog, "두 플레이어를 모두 선택하세요.", "입력 오류", JOptionPane.WARNING_MESSAGE);
+            } else if (playerA == playerB) {
+                JOptionPane.showMessageDialog(dialog, "서로 다른 플레이어를 선택하세요.", "입력 오류", JOptionPane.WARNING_MESSAGE);
+            } else {
+                if (game == null) {
+                    game = new Game(tournament.getId(), playerA.getId(), playerB.getId(), gameResult, note);
+                    GameRepository.getInstance().insert(game);
+                    tournament.getGameIds().add(game.getId());
+                    gameTableModel.addRow(getGameRow(game));
+                } else {
+                    game.setBlackPlayerId(playerA.getId());
+                    game.setWhitePlayerId(playerB.getId());
+                    game.setResult(gameResult);
+                    game.setNote(note);
 
-            Game game = new Game(tournament.getId(), playerA.getId(), playerB.getId(), gameResult, note);
-            GameRepository.getInstance().insert(game);
-            GameRepository.getInstance().save();
-            tournament.getGameIds().add(game.getId());
-            TournamentRepository.getInstance().save();
+                    int selectedRow = gameTable.getSelectedRow();
+                    if (selectedRow != -1) {
+                        gameTableModel.setValueAt(playerA.getName(), selectedRow, 1);
+                        gameTableModel.setValueAt(playerB.getName(), selectedRow, 2);
+                        gameTableModel.setValueAt(gameResult.toString(), selectedRow, 3);
+                        gameTableModel.setValueAt(note, selectedRow, 4);
+                    }
+                }
+                GameRepository.getInstance().save();
+                TournamentRepository.getInstance().save();
 
-            gameTableModel.addRow(getGameRow(game));
-        }
+                dialog.dispose();
+            }
+        });
+
+        cancelButton.addActionListener(e -> dialog.dispose());
+
+        dialog.setVisible(true);
     }
 
     private void deleteGame() {
@@ -230,6 +334,64 @@ public class AddGamePanel extends JPanel {
             }
         }
         return result;
+    }
+
+    private void showResultDialog() {
+        JDialog dialog = new JDialog((Frame) null, "총 결과", true);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setLayout(new BorderLayout());
+
+        showResultTable(dialog);
+
+        dialog.setSize(600, 400);
+        dialog.setLocationRelativeTo(null);
+        dialog.setVisible(true);
+    }
+
+    private void showResultTable(JDialog dialog) {
+        String[] gameColumnNames = {"순위", "이름", "전적", "승", "무", "패"};
+
+        Rating rating = new Rating();
+        for (Long gameId : tournament.getGameIds()) {
+            Game game = GameRepository.getInstance().findById(gameId);
+            Player bp = PlayerRepository.getInstance().findById(game.getBlackPlayerId());
+            Player wp = PlayerRepository.getInstance().findById(game.getWhitePlayerId());
+            rating.updateRating(bp, wp, game.getResult(), 1);
+        }
+        Object[][] ratingList = rating.getAllRanking();
+        Object[][] resultData = new Object[ratingList.length][gameColumnNames.length];
+        for (int i = 0; i < ratingList.length; i++) {
+            resultData[i][0] = ratingList[i][0];
+            resultData[i][1] = ratingList[i][1];
+            resultData[i][2] = (int)ratingList[i][3] + (int)ratingList[i][4] + (int)ratingList[i][5];
+            resultData[i][3] = ratingList[i][3];
+            resultData[i][4] = ratingList[i][4];
+            resultData[i][5] = ratingList[i][5];
+        }
+
+        DefaultTableModel resultTableModel = new DefaultTableModel(0, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        JTable resultTable = new JTable(resultTableModel);
+        resultTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        resultTable.setAutoCreateColumnsFromModel(false);
+
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        for (int i = 0; i < gameColumnNames.length; i++) {
+            TableColumn column = new TableColumn(i);
+            column.setHeaderValue(gameColumnNames[i]);
+            column.setCellRenderer(centerRenderer);
+            resultTable.addColumn(column);
+        }
+
+        JScrollPane resultScrollPane = new JScrollPane(resultTable);
+        resultTableModel.setDataVector(resultData, gameColumnNames);
+
+        dialog.add(resultScrollPane);
     }
 
 }
