@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 
 @Getter
+@Setter
 public class Tournament implements Serializable {
 
     @Serial
@@ -15,10 +16,10 @@ public class Tournament implements Serializable {
 
     @Setter
     private long id;
-    private final String name;
-    private final LocalDate startDate;
-    private final double weight;
-    private final ArrayList<Long> gameIds;
+    private String name;
+    private LocalDate startDate;
+    private double weight;
+    private ArrayList<Long> gameIds;
 
     public Tournament(String name, LocalDate startDate, double weight) {
         this.name = name;
