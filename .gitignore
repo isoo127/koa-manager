@@ -1,6 +1,5 @@
 .gradle
 build/*
-!build/libs
 db/
 .idea
 !gradle/wrapper/gradle-wrapper.jar
