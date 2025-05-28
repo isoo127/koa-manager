@@ -101,6 +101,42 @@ public class Rank implements Serializable, Comparable<Rank> {
         return result;
     }
 
+    public static int getRequirePoint(Rank rank) {
+        if (rank.type == RankType.KYU)
+            return 300 - rank.point;
+        if (rank.type == RankType.UNRANKED)
+            return 300 - rank.point;
+
+        // case of 'dan'
+        int requirePoint = 0;
+        switch (rank.level) {
+            case 1:
+                requirePoint = 200;
+                break;
+            case 2:
+                requirePoint = 300;
+                break;
+            case 3:
+                requirePoint = 400;
+                break;
+            case 4:
+                requirePoint = 500;
+                break;
+            case 5:
+                requirePoint = 700;
+                break;
+            case 6:
+                requirePoint = 1000;
+                break;
+            case 7:
+                requirePoint = 1500;
+                break;
+            case 8:
+                requirePoint = 2500;
+        }
+        return requirePoint - rank.point;
+    }
+
     private boolean validLevel(RankType type, int level) {
         switch (type) {
             case KYU -> {

@@ -16,7 +16,7 @@ import java.util.List;
 
 public class PlayerPanel extends JPanel {
 
-    private final String[] columnNames = {"ID", "이름", "기력", "승단포인트"};
+    private final String[] columnNames = {"ID", "이름", "기력", "보유 승단포인트", "필요 승단포인트"};
 
     private DefaultTableModel tableModel;
     private JTable playerTable;
@@ -34,7 +34,7 @@ public class PlayerPanel extends JPanel {
         PlayerRepository repository = PlayerRepository.getInstance();
         List<Player> sortedPlayers = repository.getSortedPlayers();
 
-        Object[][] data = new Object[sortedPlayers.size()][4];
+        Object[][] data = new Object[sortedPlayers.size()][5];
         int index = 0;
 
         for (Player player : sortedPlayers) {
@@ -42,6 +42,7 @@ public class PlayerPanel extends JPanel {
             data[index][1] = player.getName();
             data[index][2] = player.getRank().toString();
             data[index][3] = player.getRank().getPoint() + "점";
+            data[index][4] = Rank.getRequirePoint(player.getRank()) + "점";
             index++;
         }
 
@@ -49,11 +50,12 @@ public class PlayerPanel extends JPanel {
     }
 
     private Object[] getRow(Player player) {
-        Object[] row = new Object[4];
+        Object[] row = new Object[5];
         row[0] = player.getId();
         row[1] = player.getName();
         row[2] = player.getRank().toString();
         row[3] = player.getRank().getPoint() + "점";
+        row[4] = Rank.getRequirePoint(player.getRank()) + "점";
         return row;
     }
 
