@@ -75,7 +75,10 @@ public class PlayerPanel extends JPanel {
         topPanel.add(addButton);
 
         JButton csvButton = new JButton("csv");
-        csvButton.addActionListener(e -> CsvUtil.savePlayerDataForCsv(playerData, "db/player.csv"));
+        csvButton.addActionListener(e -> {
+            loadPlayerData();
+            CsvUtil.savePlayerDataForCsv(playerData, "db/player.csv");
+        });
         topPanel.add(csvButton);
 
         add(topPanel, BorderLayout.NORTH);

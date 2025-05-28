@@ -139,7 +139,7 @@ public class CsvUtil {
     public static void savePlayerDataForCsv(Object[][] rankingData, String filePath) {
         System.out.println("csv");
         try (CSVWriter writer = new CSVWriter(new OutputStreamWriter(new FileOutputStream(filePath), StandardCharsets.UTF_8))) {
-            writer.writeNext(new String[] {"이름", "기력", "승단포인트"});
+            writer.writeNext(new String[] {"이름", "기력", "보유 승단포인트", "필요 승단포인트"});
             for (Object[] row : rankingData) {
                 Object[] subRow = Arrays.copyOfRange(row, 1, row.length);
                 String[] rowData = Arrays.stream(subRow)
