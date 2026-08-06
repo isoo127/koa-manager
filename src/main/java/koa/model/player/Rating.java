@@ -1,14 +1,19 @@
 package koa.model.player;
 
 import koa.model.tournament.Result;
+import koa.model.tournament.Game;
 import lombok.Getter;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.LongFunction;
 
 public class Rating {
+
+    private record RatingAdjustment(double blackAdjustment, double whiteAdjustment) { }
 
     @Getter
     private static class PlayerRecord {
@@ -45,8 +50,8 @@ public class Rating {
 
     }
 
-    private final double k = 12;
-    private final double a = 0.5;
+    private static final double K = 12;
+    private static final double A = 0.5;
     private final HashMap<Long, PlayerRecord> records = new HashMap<>();
 
     private double calculateE(double d) {
@@ -54,11 +59,11 @@ public class Rating {
     }
 
     private double getWinAdjustmentVal(double ed, double weight) {
-        return (1 - ed) * k * weight + a;
+        return (1 - ed) * K * weight + A;
     }
 
     private double getLoseAdjustmentVal(double ed) {
-        return (0 - ed) * k + a;
+        return (0 - ed) * K + A;
     }
 
     private double getDrawAdjustmentVal(double ed, double weight) {
@@ -69,35 +74,60 @@ public class Rating {
         return records.computeIfAbsent(player.getId(), k1 -> new PlayerRecord(player.getName()));
     }
 
-    public void updateRating(Player blackPlayer, Player whitePlayer, Result result, double weight) {
-        PlayerRecord blackRecord = getRecord(blackPlayer);
-        PlayerRecord whiteRecord = getRecord(whitePlayer);
-
+    private RatingAdjustment calculateRatingAdjustment(PlayerRecord blackRecord, PlayerRecord whiteRecord,
+                                                        Result result, double weight) {
         double bd = blackRecord.getRating() - whiteRecord.getRating();
         double wd = bd * -1;
 
         double ebd = calculateE(bd);
         double ewd = calculateE(wd);
 
-        switch(result) {
+        return switch(result) {
+            case BLACK_WIN -> new RatingAdjustment(
+                    getWinAdjustmentVal(ebd, weight),
+                    getLoseAdjustmentVal(ewd));
+            case WHITE_WIN -> new RatingAdjustment(
+                    getLoseAdjustmentVal(ebd),
+                    getWinAdjustmentVal(ewd, weight));
+            case DRAW -> new RatingAdjustment(
+                    getDrawAdjustmentVal(ebd, weight),
+                    getDrawAdjustmentVal(ewd, weight));
+        };
+    }
+
+    private void recordGameResult(PlayerRecord blackRecord, PlayerRecord whiteRecord, Result result) {
+        switch (result) {
             case BLACK_WIN -> {
-                blackRecord.updateRating(getWinAdjustmentVal(ebd, weight));
-                whiteRecord.updateRating(getLoseAdjustmentVal(ewd));
                 blackRecord.increaseWin();
                 whiteRecord.increaseLose();
             }
             case WHITE_WIN -> {
-                whiteRecord.updateRating(getWinAdjustmentVal(ewd, weight));
-                blackRecord.updateRating(getLoseAdjustmentVal(ebd));
                 whiteRecord.increaseWin();
                 blackRecord.increaseLose();
             }
             case DRAW -> {
-                blackRecord.updateRating(getDrawAdjustmentVal(ebd, weight));
-                whiteRecord.updateRating(getDrawAdjustmentVal(ewd, weight));
                 blackRecord.increaseDraw();
                 whiteRecord.increaseDraw();
             }
+        }
+    }
+
+    public void updateTournamentRatings(List<Game> games, LongFunction<Player> playerFinder, double weight) {
+        Map<PlayerRecord, Double> ratingAdjustments = new HashMap<>();
+
+        for (Game game : games) {
+            PlayerRecord blackRecord = getRecord(playerFinder.apply(game.getBlackPlayerId()));
+            PlayerRecord whiteRecord = getRecord(playerFinder.apply(game.getWhitePlayerId()));
+            RatingAdjustment adjustment = calculateRatingAdjustment(
+                    blackRecord, whiteRecord, game.getResult(), weight);
+
+            ratingAdjustments.merge(blackRecord, adjustment.blackAdjustment, Double::sum);
+            ratingAdjustments.merge(whiteRecord, adjustment.whiteAdjustment, Double::sum);
+            recordGameResult(blackRecord, whiteRecord, game.getResult());
+        }
+
+        for (Map.Entry<PlayerRecord, Double> entry : ratingAdjustments.entrySet()) {
+            entry.getKey().updateRating(entry.getValue());
         }
     }
 
@@ -107,16 +137,9 @@ public class Rating {
         List<PlayerRecord> sortedRecords = new ArrayList<>(records.values());
         sortedRecords.sort(Comparator.comparingDouble(PlayerRecord::getRating).reversed());
         int rank = 1;
-        for (PlayerRecord record : sortedRecords) {
-            if (record.winCount + record.drawCount + record.loseCount >= 6) {
-                Object[] row = new Object[6];
-                row[0] = rank++;
-                row[1] = record.name;
-                row[2] = Math.round(record.rating * 100.0) / 100.0;;
-                row[3] = record.winCount;
-                row[4] = record.drawCount;
-                row[5] = record.loseCount;
-                ranking.add(row);
+        for (PlayerRecord rec : sortedRecords) {
+            if (rec.winCount + rec.drawCount + rec.loseCount >= 6) {
+                rank = getRank(ranking, rank, rec);
             }
         }
 
@@ -129,18 +152,23 @@ public class Rating {
         List<PlayerRecord> sortedRecords = new ArrayList<>(records.values());
         sortedRecords.sort(Comparator.comparingDouble(PlayerRecord::getRating).reversed());
         int rank = 1;
-        for (PlayerRecord record : sortedRecords) {
-            Object[] row = new Object[6];
-            row[0] = rank++;
-            row[1] = record.name;
-            row[2] = Math.round(record.rating * 100.0) / 100.0;;
-            row[3] = record.winCount;
-            row[4] = record.drawCount;
-            row[5] = record.loseCount;
-            ranking.add(row);
+        for (PlayerRecord rec : sortedRecords) {
+            rank = getRank(ranking, rank, rec);
         }
 
         return ranking.toArray(new Object[ranking.size()][]);
+    }
+
+    private int getRank(ArrayList<Object[]> ranking, int rank, PlayerRecord rec) {
+        Object[] row = new Object[6];
+        row[0] = rank++;
+        row[1] = rec.name;
+        row[2] = Math.round(rec.rating * 100.0) / 100.0;
+        row[3] = rec.winCount;
+        row[4] = rec.drawCount;
+        row[5] = rec.loseCount;
+        ranking.add(row);
+        return rank;
     }
 
     public void resetRanking() {

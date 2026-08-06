@@ -352,12 +352,11 @@ public class AddGamePanel extends JPanel {
         String[] gameColumnNames = {"순위", "이름", "전적", "승", "무", "패"};
 
         Rating rating = new Rating();
+        List<Game> games = new ArrayList<>();
         for (Long gameId : tournament.getGameIds()) {
-            Game game = GameRepository.getInstance().findById(gameId);
-            Player bp = PlayerRepository.getInstance().findById(game.getBlackPlayerId());
-            Player wp = PlayerRepository.getInstance().findById(game.getWhitePlayerId());
-            rating.updateRating(bp, wp, game.getResult(), 1);
+            games.add(GameRepository.getInstance().findById(gameId));
         }
+        rating.updateTournamentRatings(games, PlayerRepository.getInstance()::findById, 1);
         Object[][] ratingList = rating.getAllRanking();
         Object[][] resultData = new Object[ratingList.length][gameColumnNames.length];
         for (int i = 0; i < ratingList.length; i++) {

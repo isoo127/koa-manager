@@ -1,6 +1,5 @@
 package koa.gui;
 
-import koa.model.player.Player;
 import koa.model.player.Rating;
 import koa.model.tournament.Game;
 import koa.model.tournament.Tournament;
@@ -122,12 +121,7 @@ public class RankingPanel extends JPanel {
             LocalDate tournamentDate = tournament.getStartDate();
             if ((tournamentDate.isAfter(fiveYearsAgoLocalDate) || tournamentDate.isEqual(fiveYearsAgoLocalDate)) &&
                     (tournamentDate.isBefore(nowLocalDate) || tournamentDate.isEqual(nowLocalDate))) {
-                for (long id : tournament.getGameIds()) {
-                    Game game = GameRepository.getInstance().findById(id);
-                    Player blackPlayer = PlayerRepository.getInstance().findById(game.getBlackPlayerId());
-                    Player whitePlayer = PlayerRepository.getInstance().findById(game.getWhitePlayerId());
-                    rating.updateRating(blackPlayer, whitePlayer, game.getResult(), tournament.getWeight());
-                }
+                applyTournamentRating(tournament);
             }
         }
     }
@@ -140,13 +134,16 @@ public class RankingPanel extends JPanel {
                 .collect(Collectors.toCollection(ArrayList::new));
 
         for (Tournament tournament : sortedTournaments) {
-            for (long id : tournament.getGameIds()) {
-                Game game = GameRepository.getInstance().findById(id);
-                Player blackPlayer = PlayerRepository.getInstance().findById(game.getBlackPlayerId());
-                Player whitePlayer = PlayerRepository.getInstance().findById(game.getWhitePlayerId());
-                rating.updateRating(blackPlayer, whitePlayer, game.getResult(), tournament.getWeight());
-            }
+            applyTournamentRating(tournament);
         }
+    }
+
+    private void applyTournamentRating(Tournament tournament) {
+        List<Game> games = new ArrayList<>();
+        for (long id : tournament.getGameIds()) {
+            games.add(GameRepository.getInstance().findById(id));
+        }
+        rating.updateTournamentRatings(games, PlayerRepository.getInstance()::findById, tournament.getWeight());
     }
 
 }
